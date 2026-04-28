@@ -17,29 +17,27 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     defaults:
       run:
-        working-directory: ./client      
+        working-directory: ./client    
 
-    steps:
-  - name: Checkout
-    uses: actions/checkout@v4
+    steps:                        
+      - name: Checkout
+        uses: actions/checkout@v4
 
-  - name: Setup Node
-    uses: actions/setup-node@v4
-    with:
-      node-version: 18
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
 
-  - name: Install dependencies
-    working-directory: ./client
-    run: npm install --ignore-scripts
+      - name: Install dependencies
+        run: npm install --ignore-scripts
 
-  - name: Build
-    working-directory: ./client
-    run: npm run build
+      - name: Build
+        run: npm run build
 
-  - name: Upload artifact
-    uses: actions/upload-pages-artifact@v3
-    with:
-      path: './client/dist'
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './client/dist'   # relative to repository root
 
-  - name: Deploy to GitHub Pages
-    uses: actions/deploy-pages@v4
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
