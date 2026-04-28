@@ -6,18 +6,17 @@
 
 :root {
   color: #0a1727;
-  background: #f4f6f8;
+  background: #e7e7e9;
   font-family: "Noto Sans Arabic", system-ui, sans-serif;
+  text-rendering: optimizeLegibility;
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background:
-    radial-gradient(circle at top left, rgba(229, 81, 37, 0.12), transparent 22%),
-    radial-gradient(circle at top right, rgba(10, 23, 39, 0.12), transparent 28%),
-    linear-gradient(180deg, #eef2f5 0%, #f8f9fb 40%, #f4f6f8 100%);
+  line-height: 1.55;
+  background: #e7e7e9;
 }
 
 #root {
@@ -35,6 +34,21 @@ textarea {
   font: inherit;
 }
 
+button {
+  cursor: pointer;
+}
+
+input,
+select,
+textarea {
+  color: #0a1727;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #98a2ad;
+}
+
 img {
   max-width: 100%;
   display: block;
@@ -42,4 +56,47 @@ img {
 
 ::selection {
   background: rgba(229, 81, 37, 0.2);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.hero-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 44px 44px;
+  animation: grid-shift 24s linear infinite;
+}
+
+.brand-pattern {
+  background-image: radial-gradient(circle at 10px 10px, rgba(229, 81, 37, 0.08) 2px, transparent 2px);
+  background-size: 22px 22px;
+}
+
+.premium-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.premium-table th,
+.premium-table td {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 0.8rem 0.75rem;
+  text-align: start;
+}
+
+.premium-table th {
+  color: #6b717a;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+@keyframes grid-shift {
+  from { transform: translateY(0); }
+  to { transform: translateY(44px); }
 }

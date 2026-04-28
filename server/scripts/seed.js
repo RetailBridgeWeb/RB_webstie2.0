@@ -22,6 +22,7 @@ const demoUsers = [
     business_name: "Green Basket Foods",
     city: "Riyadh",
     phone: "+966500000001",
+    role: "MERCHANT",
   },
   {
     email: "seller2@retailbridge.demo",
@@ -29,6 +30,15 @@ const demoUsers = [
     business_name: "Fresh Route Trading",
     city: "Jeddah",
     phone: "+966500000002",
+    role: "MERCHANT",
+  },
+  {
+    email: "admin@retailbridge.demo",
+    password: "AdminPass123!",
+    business_name: "Retail Bridge Admin",
+    city: "Riyadh",
+    phone: "+966500000999",
+    role: "ADMIN",
   },
 ];
 
@@ -50,7 +60,7 @@ async function ensureUser(user) {
       business_name: user.business_name,
       city: user.city,
       phone: user.phone,
-      role: "MERCHANT",
+      role: user.role || "MERCHANT",
     });
 
     return existing.id;
@@ -64,7 +74,7 @@ async function ensureUser(user) {
       business_name: user.business_name,
       city: user.city,
       phone: user.phone,
-      role: "MERCHANT",
+      role: user.role || "MERCHANT",
     },
   });
 
@@ -79,7 +89,8 @@ async function main() {
   const sellerIds = [];
 
   for (const user of demoUsers) {
-    sellerIds.push(await ensureUser(user));
+    const id = await ensureUser(user);
+    if (user.role !== "ADMIN") sellerIds.push(id);
   }
 
   const payload = sampleListings.map((listing, index) => ({
@@ -94,13 +105,20 @@ async function main() {
     auto_expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
   }));
 
-  const { error } = await supabase.from("listings").insert(payload);
-
-  if (error) {
-    throw error;
+  for (const listing of payload) {
+    const { data: existing } = await supabase
+      .from("listings")
+      .select("id")
+      .eq("seller_id", listing.seller_id)
+      .eq("product_name", listing.product_name)
+      .maybeSingle();
+    if (!existing) {
+      const { error } = await supabase.from("listings").insert(listing);
+      if (error) throw error;
+    }
   }
 
-  console.log("Seeded demo users and listings successfully.");
+  console.log("Seeded demo users (including admin) and listings successfully.");
 }
 
 main().catch((error) => {
