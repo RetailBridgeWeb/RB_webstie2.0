@@ -7,28 +7,8 @@ import { supabase } from "./lib/supabase";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 const APP_URL = import.meta.env.VITE_APP_URL || window.location.origin;
-const DEBUG_ENDPOINT = "http://127.0.0.1:7778/ingest/d39bf410-cbce-4861-a70b-151d638381f5";
-const DEBUG_SESSION_ID = "770c4f";
 
 const emptyListing = { product_name: "", quantity: "", unit: "kg", price: "", expiry_date: "", location: "", notes: "" };
-
-function debugLog(location, message, data, runId = "run-1", hypothesisId = "H1") {
-  // #region agent log
-  fetch(DEBUG_ENDPOINT, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": DEBUG_SESSION_ID },
-    body: JSON.stringify({
-      sessionId: DEBUG_SESSION_ID,
-      runId,
-      hypothesisId,
-      location,
-      message,
-      data,
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
-}
 
 function App() {
   const { t, i18n } = useTranslation();
@@ -54,6 +34,12 @@ function App() {
 
   const isArabic = i18n.language === "ar";
   const needsProfileCompletion = session?.user && profile && (profile.business_name === "Unknown Business" || profile.city === "Unknown City");
+  const callbackParams = new URLSearchParams(location.search);
+  const hasOAuthCallbackContext =
+    Boolean(window.location.hash) ||
+    callbackParams.has("code") ||
+    callbackParams.has("error") ||
+    callbackParams.has("access_token");
 
   useEffect(() => {
     document.documentElement.lang = i18n.language;
@@ -63,20 +49,10 @@ function App() {
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
       const currentSession = data.session ?? null;
-      debugLog("App.jsx:getSession", "Session snapshot on bootstrap", {
-        hasSession: Boolean(currentSession),
-        hasAccessToken: Boolean(currentSession?.access_token),
-        userId: currentSession?.user?.id || null,
-        path: window.location.pathname,
-      }, "run-1", "H1");
 
       // If local storage contains a stale/foreign JWT, clear it so public reads keep working.
       if (currentSession?.access_token) {
         const { error: userError } = await supabase.auth.getUser(currentSession.access_token);
-        debugLog("App.jsx:getSession", "Validated bootstrap token", {
-          tokenValid: !Boolean(userError),
-          userErrorMessage: userError?.message || null,
-        }, "run-1", "H2");
         if (userError) {
           await supabase.auth.signOut();
           setSession(null);
@@ -89,12 +65,6 @@ function App() {
       setAuthReady(true);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, next) => {
-      debugLog("App.jsx:onAuthStateChange", "Auth state changed", {
-        eventHasSession: Boolean(next),
-        hasAccessToken: Boolean(next?.access_token),
-        userId: next?.user?.id || null,
-        path: window.location.pathname,
-      }, "run-1", "H2");
       setSession(next ?? null);
       setAuthReady(true);
     });
@@ -116,23 +86,10 @@ function App() {
     setLoading(true);
     setError("");
     const userId = session?.user?.id;
-    debugLog("App.jsx:refreshData", "Refresh data start", {
-      authReady,
-      hasSession: Boolean(session),
-      userId: userId || null,
-      hasAccessToken: Boolean(session?.access_token),
-      path: window.location.pathname,
-    }, "run-1", "H3");
     const listingsQuery = supabase.from("listings").select("id,seller_id,product_name,quantity,unit,price,status,location,expiry_date,notes,created_at,profiles:seller_id(business_name,city)").order("created_at", { ascending: false });
 
     if (!userId) {
       const { data, error: listingsError } = await listingsQuery;
-      debugLog("App.jsx:refreshData", "Anonymous listings query finished", {
-        hadError: Boolean(listingsError),
-        errorMessage: listingsError?.message || null,
-        errorCode: listingsError?.code || null,
-        rows: data?.length ?? 0,
-      }, "run-1", "H4");
       if (listingsError) setError(listingsError.message);
       setListings(data || []);
       setProfile(null);
@@ -150,15 +107,6 @@ function App() {
       supabase.from("transactions").select("id,status,quantity,total_price,seller_id,buyer_id,seller_confirmed_at,buyer_confirmed_at,listings(product_name)").order("created_at", { ascending: false }),
       supabase.from("notifications").select("id,title,message,created_at").order("created_at", { ascending: false }),
     ]);
-
-    debugLog("App.jsx:refreshData", "Authenticated data query finished", {
-      profileError: profileRes.error?.message || null,
-      listingsError: listingsRes.error?.message || null,
-      claimsError: claimsRes.error?.message || null,
-      transactionsError: txRes.error?.message || null,
-      notificationsError: notifRes.error?.message || null,
-      listingsCount: listingsRes.data?.length ?? 0,
-    }, "run-1", "H5");
 
     if (profileRes.error || listingsRes.error || claimsRes.error || txRes.error || notifRes.error) {
       setError(profileRes.error?.message || listingsRes.error?.message || claimsRes.error?.message || txRes.error?.message || notifRes.error?.message || "Failed to load data");
@@ -293,40 +241,68 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<Landing session={session} onLanguage={() => i18n.changeLanguage(i18n.language === "en" ? "ar" : "en")} onSignOut={signOut} />} />
-      <Route path="/auth" element={session?.user ? <Navigate to={needsProfileCompletion ? "/complete-profile" : "/app"} replace /> : (
-        <AuthPage authMode={authMode} setAuthMode={setAuthMode} authForm={authForm} setAuthForm={setAuthForm} busy={busy} onSubmit={handleAuthSubmit} onGoogle={handleGoogleSignIn} error={error} notice={notice} />
-      )} />
+      <Route
+        path="/auth"
+        element={
+          !authReady ? (
+            <AuthLoadingPage />
+          ) : session?.user ? (
+            <Navigate to={needsProfileCompletion ? "/complete-profile" : "/app"} replace />
+          ) : (
+            <AuthPage authMode={authMode} setAuthMode={setAuthMode} authForm={authForm} setAuthForm={setAuthForm} busy={busy} onSubmit={handleAuthSubmit} onGoogle={handleGoogleSignIn} error={error} notice={notice} />
+          )
+        }
+      />
       <Route path="/complete-profile" element={session?.user ? (
         <CompleteProfilePage authForm={authForm} setAuthForm={setAuthForm} busy={busy} onSubmit={handleCompleteProfile} />
       ) : <Navigate to="/auth" replace />} />
-      <Route path="/app" element={session?.user ? (
-        <Dashboard
-          profile={profile}
-          loading={loading}
-          tab={tab}
-          setTab={setTab}
-          listings={filteredListings}
-          sellerClaims={sellerClaims}
-          notifications={notifications}
-          myTransactions={myTransactions}
-          listingForm={listingForm}
-          setListingForm={setListingForm}
-          claimDrafts={claimDrafts}
-          setClaimDrafts={setClaimDrafts}
-          filters={filters}
-          setFilters={setFilters}
-          locationOptions={locationOptions}
-          busy={busy}
-          onCreateListing={handleCreateListing}
-          onClaim={handleClaim}
-          onAcceptClaim={(id) => api(`/claims/${id}/accept`).then(refreshData).catch((e) => setError(e.message))}
-          onDeclineClaim={(id) => supabase.from("claims").update({ status: "DECLINED" }).eq("id", id).then(refreshData)}
-          onConfirmDelivery={(id) => api(`/transactions/${id}/confirm`).then(refreshData).catch((e) => setError(e.message))}
-          onSignOut={signOut}
-          clearFilters={() => setFilters({ query: "", location: "" })}
-        />
-      ) : <Navigate to="/auth" replace />} />
+      <Route
+        path="/app"
+        element={
+          !authReady || hasOAuthCallbackContext ? (
+            <AuthLoadingPage />
+          ) : session?.user ? (
+            <Dashboard
+              profile={profile}
+              loading={loading}
+              tab={tab}
+              setTab={setTab}
+              listings={filteredListings}
+              sellerClaims={sellerClaims}
+              notifications={notifications}
+              myTransactions={myTransactions}
+              listingForm={listingForm}
+              setListingForm={setListingForm}
+              claimDrafts={claimDrafts}
+              setClaimDrafts={setClaimDrafts}
+              filters={filters}
+              setFilters={setFilters}
+              locationOptions={locationOptions}
+              busy={busy}
+              onCreateListing={handleCreateListing}
+              onClaim={handleClaim}
+              onAcceptClaim={(id) => api(`/claims/${id}/accept`).then(refreshData).catch((e) => setError(e.message))}
+              onDeclineClaim={(id) => supabase.from("claims").update({ status: "DECLINED" }).eq("id", id).then(refreshData)}
+              onConfirmDelivery={(id) => api(`/transactions/${id}/confirm`).then(refreshData).catch((e) => setError(e.message))}
+              onSignOut={signOut}
+              clearFilters={() => setFilters({ query: "", location: "" })}
+            />
+          ) : (
+            <Navigate to="/auth" replace />
+          )
+        }
+      />
     </Routes>
+  );
+}
+
+function AuthLoadingPage() {
+  return (
+    <div className="mx-auto max-w-xl px-4 py-16">
+      <div className="rounded-3xl bg-white p-8 text-center shadow-panel">
+        <p className="text-lg font-semibold text-brand-navy">Completing sign-in...</p>
+      </div>
+    </div>
   );
 }
 
