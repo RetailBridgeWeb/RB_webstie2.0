@@ -1,0 +1,45 @@
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color: #0a1727;
+  background: #f4f6f8;
+  font-family: "Noto Sans Arabic", system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(229, 81, 37, 0.12), transparent 22%),
+    radial-gradient(circle at top right, rgba(10, 23, 39, 0.12), transparent 28%),
+    linear-gradient(180deg, #eef2f5 0%, #f8f9fb 40%, #f4f6f8 100%);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+::selection {
+  background: rgba(229, 81, 37, 0.2);
+}
