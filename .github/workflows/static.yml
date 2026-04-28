@@ -15,6 +15,10 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    defaults:
+      run:
+        working-directory: ./client      
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,12 +32,11 @@ jobs:
         run: npm ci
 
       - name: Build
-        run: npm run build   # creates the dist/ folder
+        run: npm run build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './dist'     # upload only the built files
-
+          path: './client/dist'
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
