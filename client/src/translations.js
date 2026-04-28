@@ -133,6 +133,8 @@ export const resources = {
       totalExchanges: "Total exchanges",
       totalValue: "Total value",
       legacyOps: "Legacy operations view",
+      demoMode: "Demo Mode",
+      demoModeDesc: "You are viewing a demo with sample data. No real backend is connected.",
     },
   },
   ar: {
@@ -269,6 +271,8 @@ export const resources = {
       totalExchanges: "إجمالي التبادلات",
       totalValue: "إجمالي القيمة",
       legacyOps: "واجهة العمليات السابقة",
+      demoMode: "الوضع التجريبي",
+      demoModeDesc: "أنت تشاهد عرضاً تجريبياً ببيانات نموذجية. لا يوجد خادم حقيقي متصل.",
     },
   },
 };

@@ -19,7 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { supabase } from "./lib/supabase";
+import { supabase, isDemo } from "./lib/supabase";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 const APP_URL = import.meta.env.VITE_APP_URL || window.location.origin;
@@ -40,18 +40,60 @@ const seededMerchants = [
   { name: "متاجر الندى", email: "nada@example.com", status: "نشط", joined: "2026-03-19" },
 ];
 
+const DEMO_USER_ID = "demo-user-001";
+const DEMO_SELLER_ID = "demo-seller-001";
+
+const demoProfile = {
+  id: DEMO_USER_ID,
+  email: "demo@retailbridge.tech",
+  business_name: "مؤسسة العرض التجريبي",
+  city: "الرياض",
+  phone: "+966 5X XXX XXXX",
+  role: "ADMIN",
+  created_at: "2026-01-15T10:00:00Z",
+};
+
+const demoListings = [
+  { id: "dl1", seller_id: DEMO_SELLER_ID, product_name: "عصير برتقال طبيعي", quantity: 50, unit: "كرتون", price: 120, status: "ACTIVE", location: "حي الروضة", expiry_date: "2026-05-15", notes: "منتج طازج", created_at: "2026-04-20T08:00:00Z", profiles: { business_name: "مؤسسة الخير الغذائية", city: "الرياض" } },
+  { id: "dl2", seller_id: DEMO_SELLER_ID, product_name: "أرز بسمتي", quantity: 30, unit: "كيس 10 كجم", price: 90, status: "ACTIVE", location: "حي النسيم", expiry_date: "2026-08-01", notes: "", created_at: "2026-04-19T12:00:00Z", profiles: { business_name: "أسواق الروضة", city: "الرياض" } },
+  { id: "dl3", seller_id: DEMO_SELLER_ID, product_name: "زيت زيتون بكر", quantity: 80, unit: "علبة", price: 45, status: "ACTIVE", location: "حي العليا", expiry_date: "2026-09-20", notes: "جودة عالية", created_at: "2026-04-18T14:00:00Z", profiles: { business_name: "شركة النسيم التجارية", city: "جدة" } },
+  { id: "dl4", seller_id: DEMO_SELLER_ID, product_name: "حليب طويل الأجل", quantity: 200, unit: "كرتون", price: 65, status: "ACTIVE", location: "حي الملز", expiry_date: "2026-06-30", notes: "", created_at: "2026-04-17T09:00:00Z", profiles: { business_name: "توزيع البركة", city: "الرياض" } },
+  { id: "dl5", seller_id: DEMO_SELLER_ID, product_name: "سكر أبيض", quantity: 150, unit: "كيس 5 كجم", price: 35, status: "ACTIVE", location: "حي الروضة", expiry_date: "2027-01-01", notes: "عرض كمية", created_at: "2026-04-16T11:00:00Z", profiles: { business_name: "متاجر الندى", city: "الدمام" } },
+  { id: "dl6", seller_id: DEMO_SELLER_ID, product_name: "معجون طماطم", quantity: 60, unit: "كرتون", price: 55, status: "ACTIVE", location: "حي النسيم", expiry_date: "2026-07-15", notes: "", created_at: "2026-04-15T15:00:00Z", profiles: { business_name: "مؤسسة الخير الغذائية", city: "الرياض" } },
+];
+
+const demoTransactions = [
+  { id: "dt1", status: "COMPLETED", quantity: 20, total_price: 2400, seller_id: DEMO_SELLER_ID, buyer_id: DEMO_USER_ID, created_at: "2026-04-22T10:00:00Z", seller_confirmed_at: "2026-04-23T08:00:00Z", buyer_confirmed_at: "2026-04-23T09:00:00Z", listings: { product_name: "عصير برتقال طبيعي" } },
+  { id: "dt2", status: "COMPLETED", quantity: 10, total_price: 900, seller_id: DEMO_SELLER_ID, buyer_id: DEMO_USER_ID, created_at: "2026-04-21T14:00:00Z", seller_confirmed_at: "2026-04-22T10:00:00Z", buyer_confirmed_at: "2026-04-22T11:00:00Z", listings: { product_name: "أرز بسمتي" } },
+  { id: "dt3", status: "PENDING", quantity: 30, total_price: 1350, seller_id: DEMO_SELLER_ID, buyer_id: DEMO_USER_ID, created_at: "2026-04-25T09:00:00Z", seller_confirmed_at: null, buyer_confirmed_at: null, listings: { product_name: "زيت زيتون بكر" } },
+  { id: "dt4", status: "COMPLETED", quantity: 50, total_price: 3250, seller_id: DEMO_SELLER_ID, buyer_id: DEMO_USER_ID, created_at: "2026-04-20T16:00:00Z", seller_confirmed_at: "2026-04-21T08:00:00Z", buyer_confirmed_at: "2026-04-21T10:00:00Z", listings: { product_name: "حليب طويل الأجل" } },
+];
+
+const demoClaims = [
+  { id: "dc1", listing_id: "dl1", buyer_id: DEMO_USER_ID, quantity_requested: 15, status: "PENDING", message: "نحتاج الكمية بأسرع وقت", created_at: "2026-04-26T08:00:00Z", listings: { product_name: "عصير برتقال طبيعي", seller_id: DEMO_SELLER_ID, unit: "كرتون" }, profiles: { business_name: "أسواق الروضة", city: "الرياض" } },
+  { id: "dc2", listing_id: "dl3", buyer_id: DEMO_USER_ID, quantity_requested: 40, status: "ACCEPTED", message: null, created_at: "2026-04-25T12:00:00Z", listings: { product_name: "زيت زيتون بكر", seller_id: DEMO_SELLER_ID, unit: "علبة" }, profiles: { business_name: "شركة النسيم التجارية", city: "جدة" } },
+];
+
+const demoNotifications = [
+  { id: "dn1", title: "طلب حجز جديد", message: "تم تقديم طلب حجز على عصير برتقال طبيعي", created_at: "2026-04-26T08:00:00Z" },
+  { id: "dn2", title: "تم قبول الطلب", message: "تم قبول طلب الحجز على زيت زيتون بكر", created_at: "2026-04-25T12:30:00Z" },
+  { id: "dn3", title: "تأكيد التسليم", message: "تم تأكيد تسليم أرز بسمتي بنجاح", created_at: "2026-04-22T11:00:00Z" },
+  { id: "dn4", title: "عرض جديد", message: "تمت إضافة منتج جديد: معجون طماطم", created_at: "2026-04-15T15:00:00Z" },
+  { id: "dn5", title: "صفقة مكتملة", message: "تم إتمام صفقة حليب طويل الأجل بقيمة 3,250 ر.س", created_at: "2026-04-21T10:00:00Z" },
+];
+
 function App() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
-  const [session, setSession] = useState(null);
-  const [authReady, setAuthReady] = useState(false);
-  const [profile, setProfile] = useState(null);
-  const [listings, setListings] = useState([]);
-  const [claims, setClaims] = useState([]);
-  const [transactions, setTransactions] = useState([]);
-  const [notifications, setNotifications] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState(isDemo ? { user: { id: DEMO_USER_ID }, access_token: "demo" } : null);
+  const [authReady, setAuthReady] = useState(isDemo);
+  const [profile, setProfile] = useState(isDemo ? demoProfile : null);
+  const [listings, setListings] = useState(isDemo ? demoListings : []);
+  const [claims, setClaims] = useState(isDemo ? demoClaims : []);
+  const [transactions, setTransactions] = useState(isDemo ? demoTransactions : []);
+  const [notifications, setNotifications] = useState(isDemo ? demoNotifications : []);
+  const [loading, setLoading] = useState(!isDemo);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -72,6 +114,7 @@ function App() {
   }, [i18n.language, isArabic]);
 
   useEffect(() => {
+    if (isDemo) return; // demo mode – skip real auth
     supabase.auth.getSession().then(async ({ data }) => {
       const currentSession = data.session ?? null;
       if (currentSession?.access_token) {
@@ -94,6 +137,7 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (isDemo) return; // demo mode – data is already seeded
     if (!authReady) return;
     if (session?.user) document.cookie = "rb_logged_in=1; path=/; max-age=2592000; SameSite=Lax";
     else document.cookie = "rb_logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
@@ -230,6 +274,7 @@ function App() {
   }
 
   async function handleClaim(listingId) {
+    if (isDemo) { setNotice(t("claimSubmitted") + " (Demo)"); return; }
     const draft = claimDrafts[listingId] || {};
     setBusy(`claim-${listingId}`);
     try {
@@ -262,6 +307,7 @@ function App() {
     t,
     session,
     profile,
+    isDemo,
     onLanguage: () => i18n.changeLanguage(i18n.language === "en" ? "ar" : "en"),
     onSignOut: signOut,
   };
@@ -270,18 +316,18 @@ function App() {
     <Routes>
       <Route path="/" element={<SiteLayout {...sharedProps}><LandingPage t={t} /></SiteLayout>} />
       <Route path="/marketplace" element={<SiteLayout {...sharedProps}><MarketplacePage t={t} listings={filteredListings} profile={profile} claimDrafts={claimDrafts} setClaimDrafts={setClaimDrafts} onClaim={handleClaim} busy={busy} filters={filters} setFilters={setFilters} locationOptions={locationOptions} loading={loading} /></SiteLayout>} />
-      <Route path="/dashboard" element={!authReady || hasOAuthCallbackContext ? <AuthLoadingPage t={t} /> : session?.user ? <SiteLayout {...sharedProps}><DashboardPage t={t} listings={filteredListings} myTransactions={myTransactions} liquidityUnlocked={liquidityUnlocked} notifications={notifications} /></SiteLayout> : <Navigate to="/auth" replace />} />
-      <Route path="/admin" element={!authReady || hasOAuthCallbackContext ? <AuthLoadingPage t={t} /> : session?.user ? (profile?.role === "ADMIN" ? <SiteLayout {...sharedProps}><AdminPage t={t} listings={listings} tx={transactions} /></SiteLayout> : <Navigate to="/dashboard" replace />) : <Navigate to="/auth" replace />} />
-      <Route path="/profile" element={!authReady || hasOAuthCallbackContext ? <AuthLoadingPage t={t} /> : session?.user ? <SiteLayout {...sharedProps}><ProfilePage t={t} profile={profile} tx={myTransactions} /></SiteLayout> : <Navigate to="/auth" replace />} />
+      <Route path="/dashboard" element={isDemo || session?.user ? <SiteLayout {...sharedProps}><DashboardPage t={t} listings={filteredListings} myTransactions={myTransactions} liquidityUnlocked={liquidityUnlocked} notifications={notifications} /></SiteLayout> : (!authReady || hasOAuthCallbackContext ? <AuthLoadingPage t={t} /> : <Navigate to="/auth" replace />)} />
+      <Route path="/admin" element={isDemo || (session?.user && profile?.role === "ADMIN") ? <SiteLayout {...sharedProps}><AdminPage t={t} listings={listings} tx={transactions} /></SiteLayout> : (!authReady || hasOAuthCallbackContext ? <AuthLoadingPage t={t} /> : <Navigate to={session?.user ? "/dashboard" : "/auth"} replace />)} />
+      <Route path="/profile" element={isDemo || session?.user ? <SiteLayout {...sharedProps}><ProfilePage t={t} profile={profile} tx={myTransactions} /></SiteLayout> : (!authReady || hasOAuthCallbackContext ? <AuthLoadingPage t={t} /> : <Navigate to="/auth" replace />)} />
       <Route path="/app" element={<Navigate to="/dashboard" replace />} />
-      <Route path="/auth" element={!authReady ? <AuthLoadingPage t={t} /> : session?.user ? <Navigate to={needsProfileCompletion ? "/complete-profile" : "/dashboard"} replace /> : <SiteLayout {...sharedProps}><AuthPage t={t} authMode={authMode} setAuthMode={setAuthMode} authForm={authForm} setAuthForm={setAuthForm} busy={busy} onSubmit={handleAuthSubmit} onGoogle={handleGoogleSignIn} error={error} notice={notice} /></SiteLayout>} />
-      <Route path="/complete-profile" element={session?.user ? <SiteLayout {...sharedProps}><CompleteProfilePage t={t} authForm={authForm} setAuthForm={setAuthForm} busy={busy} onSubmit={handleCompleteProfile} /></SiteLayout> : <Navigate to="/auth" replace />} />
-      <Route path="/legacy-dashboard" element={!authReady || hasOAuthCallbackContext ? <AuthLoadingPage t={t} /> : session?.user ? <SiteLayout {...sharedProps}><LegacyOps t={t} profile={profile} sellerClaims={sellerClaims} myTransactions={myTransactions} listingForm={listingForm} setListingForm={setListingForm} onCreateListing={handleCreateListing} onAcceptClaim={(id) => api(`/claims/${id}/accept`).then(refreshData).catch((e) => setError(e.message))} onDeclineClaim={(id) => supabase.from("claims").update({ status: "DECLINED" }).eq("id", id).then(refreshData)} onConfirmDelivery={(id) => api(`/transactions/${id}/confirm`).then(refreshData).catch((e) => setError(e.message))} /></SiteLayout> : <Navigate to="/auth" replace />} />
+      <Route path="/auth" element={isDemo ? <Navigate to="/dashboard" replace /> : (!authReady ? <AuthLoadingPage t={t} /> : session?.user ? <Navigate to={needsProfileCompletion ? "/complete-profile" : "/dashboard"} replace /> : <SiteLayout {...sharedProps}><AuthPage t={t} authMode={authMode} setAuthMode={setAuthMode} authForm={authForm} setAuthForm={setAuthForm} busy={busy} onSubmit={handleAuthSubmit} onGoogle={handleGoogleSignIn} error={error} notice={notice} /></SiteLayout>)} />
+      <Route path="/complete-profile" element={isDemo ? <Navigate to="/dashboard" replace /> : (session?.user ? <SiteLayout {...sharedProps}><CompleteProfilePage t={t} authForm={authForm} setAuthForm={setAuthForm} busy={busy} onSubmit={handleCompleteProfile} /></SiteLayout> : <Navigate to="/auth" replace />)} />
+      <Route path="/legacy-dashboard" element={isDemo || session?.user ? <SiteLayout {...sharedProps}><LegacyOps t={t} profile={profile} sellerClaims={sellerClaims} myTransactions={myTransactions} listingForm={listingForm} setListingForm={setListingForm} onCreateListing={isDemo ? (e) => { e.preventDefault(); setNotice(t("listingPosted") + " (Demo)"); } : handleCreateListing} onAcceptClaim={isDemo ? () => setNotice("Demo") : (id) => api(`/claims/${id}/accept`).then(refreshData).catch((e) => setError(e.message))} onDeclineClaim={isDemo ? () => setNotice("Demo") : (id) => supabase.from("claims").update({ status: "DECLINED" }).eq("id", id).then(refreshData)} onConfirmDelivery={isDemo ? () => setNotice("Demo") : (id) => api(`/transactions/${id}/confirm`).then(refreshData).catch((e) => setError(e.message))} /></SiteLayout> : (!authReady || hasOAuthCallbackContext ? <AuthLoadingPage t={t} /> : <Navigate to="/auth" replace />)} />
     </Routes>
   );
 }
 
-function SiteLayout({ t, session, profile, onSignOut, onLanguage, children }) {
+function SiteLayout({ t, session, profile, isDemo: demo, onSignOut, onLanguage, children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const isAdmin = profile?.role === "ADMIN";
   const navItems = [
@@ -293,6 +339,11 @@ function SiteLayout({ t, session, profile, onSignOut, onLanguage, children }) {
   ];
   return (
     <div className="min-h-screen w-full">
+      {demo ? (
+        <div className="bg-gradient-to-r from-brand-orange to-amber-500 px-4 py-2 text-center text-xs font-bold text-white sm:text-sm">
+          🚀 {t("demoMode") || "Demo Mode"} — {t("demoModeDesc") || "You are viewing a demo with sample data. No real backend is connected."}
+        </div>
+      ) : null}
       <header className="sticky top-0 z-40 border-b border-brand-border bg-white/95 backdrop-blur">
         <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <Link to="/" className="flex items-center gap-2">
