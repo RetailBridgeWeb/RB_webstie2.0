@@ -7,14 +7,35 @@ import { supabase } from "./lib/supabase";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 const APP_URL = import.meta.env.VITE_APP_URL || window.location.origin;
+const DEBUG_ENDPOINT = "http://127.0.0.1:7778/ingest/d39bf410-cbce-4861-a70b-151d638381f5";
+const DEBUG_SESSION_ID = "770c4f";
 
 const emptyListing = { product_name: "", quantity: "", unit: "kg", price: "", expiry_date: "", location: "", notes: "" };
+
+function debugLog(location, message, data, runId = "run-1", hypothesisId = "H1") {
+  // #region agent log
+  fetch(DEBUG_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": DEBUG_SESSION_ID },
+    body: JSON.stringify({
+      sessionId: DEBUG_SESSION_ID,
+      runId,
+      hypothesisId,
+      location,
+      message,
+      data,
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
+}
 
 function App() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const [session, setSession] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
   const [profile, setProfile] = useState(null);
   const [listings, setListings] = useState([]);
   const [claims, setClaims] = useState([]);
@@ -42,28 +63,50 @@ function App() {
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
       const currentSession = data.session ?? null;
+      debugLog("App.jsx:getSession", "Session snapshot on bootstrap", {
+        hasSession: Boolean(currentSession),
+        hasAccessToken: Boolean(currentSession?.access_token),
+        userId: currentSession?.user?.id || null,
+        path: window.location.pathname,
+      }, "run-1", "H1");
 
       // If local storage contains a stale/foreign JWT, clear it so public reads keep working.
       if (currentSession?.access_token) {
         const { error: userError } = await supabase.auth.getUser(currentSession.access_token);
+        debugLog("App.jsx:getSession", "Validated bootstrap token", {
+          tokenValid: !Boolean(userError),
+          userErrorMessage: userError?.message || null,
+        }, "run-1", "H2");
         if (userError) {
           await supabase.auth.signOut();
           setSession(null);
+          setAuthReady(true);
           return;
         }
       }
 
       setSession(currentSession);
+      setAuthReady(true);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, next) => setSession(next ?? null));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, next) => {
+      debugLog("App.jsx:onAuthStateChange", "Auth state changed", {
+        eventHasSession: Boolean(next),
+        hasAccessToken: Boolean(next?.access_token),
+        userId: next?.user?.id || null,
+        path: window.location.pathname,
+      }, "run-1", "H2");
+      setSession(next ?? null);
+      setAuthReady(true);
+    });
     return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
+    if (!authReady) return;
     if (session?.user) document.cookie = "rb_logged_in=1; path=/; max-age=2592000; SameSite=Lax";
     else document.cookie = "rb_logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     refreshData();
-  }, [session?.user?.id]);
+  }, [authReady, session?.user?.id]);
 
   useEffect(() => {
     if (needsProfileCompletion && location.pathname !== "/complete-profile") navigate("/complete-profile");
@@ -73,10 +116,23 @@ function App() {
     setLoading(true);
     setError("");
     const userId = session?.user?.id;
+    debugLog("App.jsx:refreshData", "Refresh data start", {
+      authReady,
+      hasSession: Boolean(session),
+      userId: userId || null,
+      hasAccessToken: Boolean(session?.access_token),
+      path: window.location.pathname,
+    }, "run-1", "H3");
     const listingsQuery = supabase.from("listings").select("id,seller_id,product_name,quantity,unit,price,status,location,expiry_date,notes,created_at,profiles:seller_id(business_name,city)").order("created_at", { ascending: false });
 
     if (!userId) {
       const { data, error: listingsError } = await listingsQuery;
+      debugLog("App.jsx:refreshData", "Anonymous listings query finished", {
+        hadError: Boolean(listingsError),
+        errorMessage: listingsError?.message || null,
+        errorCode: listingsError?.code || null,
+        rows: data?.length ?? 0,
+      }, "run-1", "H4");
       if (listingsError) setError(listingsError.message);
       setListings(data || []);
       setProfile(null);
@@ -94,6 +150,15 @@ function App() {
       supabase.from("transactions").select("id,status,quantity,total_price,seller_id,buyer_id,seller_confirmed_at,buyer_confirmed_at,listings(product_name)").order("created_at", { ascending: false }),
       supabase.from("notifications").select("id,title,message,created_at").order("created_at", { ascending: false }),
     ]);
+
+    debugLog("App.jsx:refreshData", "Authenticated data query finished", {
+      profileError: profileRes.error?.message || null,
+      listingsError: listingsRes.error?.message || null,
+      claimsError: claimsRes.error?.message || null,
+      transactionsError: txRes.error?.message || null,
+      notificationsError: notifRes.error?.message || null,
+      listingsCount: listingsRes.data?.length ?? 0,
+    }, "run-1", "H5");
 
     if (profileRes.error || listingsRes.error || claimsRes.error || txRes.error || notifRes.error) {
       setError(profileRes.error?.message || listingsRes.error?.message || claimsRes.error?.message || txRes.error?.message || notifRes.error?.message || "Failed to load data");
@@ -456,23 +521,25 @@ function Dashboard({
 }
 
 function Field({ label, value, onChange, type = "text", as = "input" }) {
+  const fieldId = `field-${String(label).toLowerCase().replace(/[^a-z0-9]+/gi, "-")}`;
   return (
-    <label className="block">
+    <label className="block" htmlFor={fieldId}>
       <span className="mb-2 block text-sm font-semibold text-brand-grey">{label}</span>
       {as === "textarea" ? (
-        <textarea value={value} onChange={(e) => onChange(e.target.value)} rows={4} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-brand-orange" />
+        <textarea id={fieldId} name={fieldId} value={value} onChange={(e) => onChange(e.target.value)} rows={4} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-brand-orange" />
       ) : (
-        <input type={type} value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-brand-orange" />
+        <input id={fieldId} name={fieldId} type={type} value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-brand-orange" />
       )}
     </label>
   );
 }
 
 function SelectField({ label, value, onChange, options }) {
+  const fieldId = `field-${String(label).toLowerCase().replace(/[^a-z0-9]+/gi, "-")}`;
   return (
-    <label className="block">
+    <label className="block" htmlFor={fieldId}>
       <span className="mb-2 block text-sm font-semibold text-brand-grey">{label}</span>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-brand-orange">
+      <select id={fieldId} name={fieldId} value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-brand-orange">
         {options.map((opt) => <option key={`${label}-${opt.value}`} value={opt.value}>{opt.label}</option>)}
       </select>
     </label>
